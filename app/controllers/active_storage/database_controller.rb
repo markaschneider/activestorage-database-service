@@ -41,13 +41,19 @@ class ActiveStorage::DatabaseController < ActiveStorage::BaseController
     ActiveStorage.verifier.verified(params[:encoded_key], purpose: :blob_key)
   end
 
+  def chunk_size
+    @@chunk_size ||= Rails.configuration.active_storage.stream_chunk_size || 2_097_152 # 2 MB default
+  end
+
   def serve_file(key, last_modified:, content_length:, content_type:, disposition:)
     response.headers["Content-Type"] = content_type || DEFAULT_SEND_FILE_TYPE
     response.headers["Content-Disposition"] = disposition || DEFAULT_SEND_FILE_DISPOSITION
     response.headers["Content-Length"] = content_length if !content_length.nil?
     response.headers["Last-Modified"] = last_modified if !last_modified.nil?
 
-    send_data database_service.download(key)
+    streamer = ActiveStorage::Service::DatabaseService::FileContentStreamer.new(key, chunk_size)
+    response_body = streamer
+    # render template: false, layout: false
   end
 
 
